@@ -2,7 +2,7 @@ import pandas as pd
 import pickle
 import re
 import os
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer  # Changed from CountVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score
@@ -39,7 +39,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # Create and train vectorizer and model
 print("Training vectorizer and model...")
-vectorizer = CountVectorizer(max_features=3000)
+vectorizer = TfidfVectorizer(max_features=3000)  # Using TfidfVectorizer instead
 X_train_vect = vectorizer.fit_transform(X_train)
 model = MultinomialNB()
 model.fit(X_train_vect, y_train)
@@ -50,13 +50,13 @@ y_pred = model.predict(X_test_vect)
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Model accuracy: {accuracy:.4f}")
 
-# Save models
+# Save models using protocol=4 for better compatibility
 print("Saving models...")
 with open('vectorizer.pkl', 'wb') as f:
-    pickle.dump(vectorizer, f)
+    pickle.dump(vectorizer, f, protocol=4)
 
 with open('model.pkl', 'wb') as f:
-    pickle.dump(model, f)
+    pickle.dump(model, f, protocol=4)
 
 print("Model and vectorizer saved successfully!")
 
