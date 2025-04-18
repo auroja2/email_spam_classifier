@@ -1,12 +1,22 @@
+# At the top of your app.py
+# At the top of your app.py
+import os
+import sys
 import streamlit as st
+
+# Only try to install packages if they're not already available
+try:
+    import nltk
+    from nltk.corpus import stopwords
+    from nltk.stem.porter import PorterStemmer
+except ImportError:
+    st.error("Required packages are missing. Please make sure to install them with 'pip install -r requirements.txt'")
+    st.stop()
+
 import pickle
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
 import string
 import pandas as pd
 import warnings
-import os
 
 # Suppress version warnings
 warnings.filterwarnings("ignore", category=UserWarning)
