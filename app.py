@@ -56,19 +56,17 @@ def simple_preprocess(text):
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-# Load model and vectorizer
+# Load model and vectorizer with improved error handling
 @st.cache_resource
 def load_models():
-    # Get the directory of the current file
     try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        vectorizer_path = os.path.join(current_dir, 'vectorizer.pkl')
-        model_path = os.path.join(current_dir, 'model.pkl')
-        
-        with open(vectorizer_path, 'rb') as f:
+        with open('vectorizer.pkl', 'rb') as f:
             vectorizer = pickle.load(f)
-        with open(model_path, 'rb') as f:
+        with open('model.pkl', 'rb') as f:
             model = pickle.load(f)
+        # Verify the vectorizer type and check if it's fitted
+        vectorizer_type = type(vectorizer).__name__
+        st.sidebar.success(f"Loaded {vectorizer_type} successfully!")
         return vectorizer, model, True
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
@@ -76,6 +74,10 @@ def load_models():
 
 # First try to load pre-trained models
 vectorizer, model, models_loaded = load_models()
+
+# Add a sidebar with info
+st.sidebar.title("About")
+st.sidebar.info("This app classifies SMS messages as spam or legitimate using machine learning.")
 
 # If models aren't available, offer training option
 if not models_loaded:
@@ -111,9 +113,18 @@ if not models_loaded:
                     model = MultinomialNB()
                     model.fit(X_train_vect, y_train)
                     
-                    # Save models in memory
+                    # Save the trained models
+                    with open('vectorizer.pkl', 'wb') as f:
+                        pickle.dump(vectorizer, f)
+                    with open('model.pkl', 'wb') as f:
+                        pickle.dump(model, f)
+                    
+                    # Update the loaded models
                     models_loaded = True
-                    st.success("Model trained successfully!")
+                    st.success("Model trained and saved successfully!")
+                    
+                    # Reload page to use the new model
+                    st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Error training model: {str(e)}")
     else:
@@ -160,8 +171,14 @@ if st.button('Classify Message', type="primary"):
                 
                 # Step 2: Vectorize
                 with col2:
-                    vector_input = vectorizer.transform([processed_text])
-                    st.success("✓ Vectorization")
+                    # Add try/except to catch specific vectorize errors
+                    try:
+                        vector_input = vectorizer.transform([processed_text])
+                        st.success("✓ Vectorization")
+                    except Exception as ve:
+                        st.error("Vectorization error")
+                        st.error(f"Error details: {str(ve)}")
+                        st.stop()
                 
                 # Step 3: Predict
                 with col3:
@@ -181,9 +198,23 @@ if st.button('Classify Message', type="primary"):
                     st.info(message)
                     st.markdown("**Processed text:**")
                     st.code(processed_text)
+                    st.markdown("**Model information:**")
+                    st.code(f"Vectorizer type: {type(vectorizer).__name__}\nModel type: {type(model).__name__}")
         except Exception as e:
             st.error(f"An error occurred during classification: {str(e)}")
-            st.info("If you're seeing fitting errors, try retraining the model.")
+            
+            # More detailed error information
+            if "idf vector is not fitted" in str(e):
+                st.error("The vectorizer was not properly fitted. Try retraining the model.")
+                if st.button("Show debugging info"):
+                    st.json({
+                        "Vectorizer type": str(type(vectorizer)),
+                        "Model type": str(type(model)),
+                        "Error type": str(type(e).__name__),
+                        "Error message": str(e)
+                    })
+            else:
+                st.info("If you're seeing fitting errors, try retraining the model.")
 
 # Add info at the bottom
 st.divider()
@@ -195,3 +226,8 @@ It preprocesses text and uses a Naive Bayes classifier to detect patterns common
 
 # Footer
 st.markdown("<div style='text-align:center; color:gray; font-size:12px; margin-top:30px;'>SMS Spam Classifier • Deployed on Streamlit Cloud</div>", unsafe_allow_html=True)
+
+# Version info in sidebar
+st.sidebar.markdown("---")
+st.sidebar.caption("Version 1.0.2")
+st.sidebar.caption(f"Using Python {os.sys.version.split()[0]}")
