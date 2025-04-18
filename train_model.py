@@ -2,7 +2,7 @@ import pandas as pd
 import pickle
 import re
 import os
-from sklearn.feature_extraction.text import TfidfVectorizer  # Changed from CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer  # Use CountVectorizer instead
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score
@@ -39,7 +39,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # Create and train vectorizer and model
 print("Training vectorizer and model...")
-vectorizer = TfidfVectorizer(max_features=3000)  # Using TfidfVectorizer instead
+vectorizer = CountVectorizer(max_features=3000)  # Changed to CountVectorizer
 X_train_vect = vectorizer.fit_transform(X_train)
 model = MultinomialNB()
 model.fit(X_train_vect, y_train)
