@@ -6,6 +6,7 @@ from nltk.stem.porter import PorterStemmer
 import string
 import pandas as pd
 import warnings
+import os
 
 # Suppress version warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -17,12 +18,25 @@ st.set_page_config(
     layout="centered"
 )
 
-# Download NLTK resources
+# Download NLTK resources with better error handling
 @st.cache_resource
 def download_nltk_resources():
-    nltk.download('stopwords')
-    nltk.download('punkt')
+    try:
+        # Check if the data already exists to avoid redownloading
+        nltk.data.find('tokenizers/punkt')
+        nltk.data.find('corpora/stopwords')
+        st.sidebar.success("NLTK resources loaded successfully!")
+    except LookupError:
+        try:
+            # If not found, download the required NLTK data
+            nltk.download('stopwords')
+            nltk.download('punkt')
+            st.sidebar.success("NLTK resources downloaded successfully!")
+        except Exception as e:
+            st.sidebar.error(f"Error downloading NLTK resources: {str(e)}")
+            st.stop()
 
+# Call the download function at startup
 download_nltk_resources()
 
 # Header
@@ -56,16 +70,23 @@ def transform(text):
     
     return " ".join(y)
 
-# Load model and vectorizer
+# Load model and vectorizer with improved error handling
 @st.cache_resource
 def load_models():
-    try:
-        tfidf = pickle.load(open('vectorizer.pkl', 'rb'))
-        model = pickle.load(open('model.pkl', 'rb'))
-        return tfidf, model, True
-    except FileNotFoundError:
-        st.error("Model files not found. Please run the training code first.")
+    model_path = 'model.pkl'
+    vectorizer_path = 'vectorizer.pkl'
+    
+    # Check if files exist
+    if not os.path.exists(model_path) or not os.path.exists(vectorizer_path):
+        st.error("Model files not found. Please make sure model.pkl and vectorizer.pkl exist in the application directory.")
         return None, None, False
+        
+    try:
+        with open(vectorizer_path, 'rb') as f:
+            tfidf = pickle.load(f)
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        return tfidf, model, True
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
         return None, None, False
@@ -102,40 +123,44 @@ if st.button('Classify Message', type="primary"):
     elif not message:
         st.warning("Please enter a message to classify.")
     else:
-        with st.spinner('Analyzing message...'):
-            # Process steps with visual feedback
-            col1, col2, col3 = st.columns(3)
-            
-            # Step 1: Preprocess
-            with col1:
-                transformed_message = transform(message)
-                st.success("✓ Preprocessing")
-            
-            # Step 2: Vectorize
-            with col2:
-                vector_input = tfidf.transform([transformed_message])
-                st.success("✓ Vectorization")
-            
-            # Step 3: Predict
-            with col3:
-                prediction = model.predict(vector_input)[0]
-                st.success("✓ Classification")
-            
-            # Show result with appropriate styling
-            st.divider()
-            if prediction == 1:
-                st.error("## 🚨 SPAM DETECTED 🚨")
-                st.markdown("This message has been classified as **spam**.")
-            else:
-                st.success("## ✅ HAM (NOT SPAM)")
-                st.markdown("This message appears to be legitimate.")
-            
-            # Show processing details in an expander
-            with st.expander("View processing details"):
-                st.markdown("**Original message:**")
-                st.info(message)
-                st.markdown("**Transformed text:**")
-                st.code(transformed_message)
+        try:
+            with st.spinner('Analyzing message...'):
+                # Process steps with visual feedback
+                col1, col2, col3 = st.columns(3)
+                
+                # Step 1: Preprocess
+                with col1:
+                    transformed_message = transform(message)
+                    st.success("✓ Preprocessing")
+                
+                # Step 2: Vectorize
+                with col2:
+                    vector_input = tfidf.transform([transformed_message])
+                    st.success("✓ Vectorization")
+                
+                # Step 3: Predict
+                with col3:
+                    prediction = model.predict(vector_input)[0]
+                    st.success("✓ Classification")
+                
+                # Show result with appropriate styling
+                st.divider()
+                if prediction == 1:
+                    st.error("## 🚨 SPAM DETECTED 🚨")
+                    st.markdown("This message has been classified as **spam**.")
+                else:
+                    st.success("## ✅ HAM (NOT SPAM)")
+                    st.markdown("This message appears to be legitimate.")
+                
+                # Show processing details in an expander
+                with st.expander("View processing details"):
+                    st.markdown("**Original message:**")
+                    st.info(message)
+                    st.markdown("**Transformed text:**")
+                    st.code(transformed_message)
+        except Exception as e:
+            st.error(f"An error occurred during classification: {str(e)}")
+            st.info("If you're seeing dimension mismatch errors, it's likely the model and vectorizer are incompatible.")
 
 # Add helpful info at the bottom
 st.divider()
@@ -158,3 +183,11 @@ except:
     # If the file doesn't exist, show generic information
     st.sidebar.header("Model Info")
     st.sidebar.write("Using Naive Bayes classification with TF-IDF features")
+
+# Add deployment info in the sidebar
+st.sidebar.divider()
+st.sidebar.markdown("**Project Deployment**")
+st.sidebar.markdown("""
+- GitHub: [View Source](https://github.com/yourusername/sms-spam-classifier)
+- Created: April 2025
+""")
