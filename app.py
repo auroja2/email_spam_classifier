@@ -60,14 +60,29 @@ def simple_preprocess(text):
 @st.cache_resource
 def load_models():
     try:
-        with open('vectorizer.pkl', 'rb') as f:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        vectorizer_path = os.path.join(current_dir, 'vectorizer.pkl')
+        model_path = os.path.join(current_dir, 'model.pkl')
+        
+        # More robust file loading with absolute paths
+        with open(vectorizer_path, 'rb') as f:
             vectorizer = pickle.load(f)
-        with open('model.pkl', 'rb') as f:
+        with open(model_path, 'rb') as f:
             model = pickle.load(f)
+        
         # Verify the vectorizer type and check if it's fitted
         vectorizer_type = type(vectorizer).__name__
         st.sidebar.success(f"Loaded {vectorizer_type} successfully!")
-        return vectorizer, model, True
+        
+        # Test vectorizer to ensure it's properly fitted
+        test_text = "test message"
+        try:
+            vectorizer.transform([test_text])
+            return vectorizer, model, True
+        except Exception as test_error:
+            st.error(f"Vectorizer validation failed: {str(test_error)}")
+            return None, None, False
+            
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
         return None, None, False
@@ -81,7 +96,7 @@ st.sidebar.info("This app classifies SMS messages as spam or legitimate using ma
 
 # If models aren't available, offer training option
 if not models_loaded:
-    st.warning("Pre-trained model not found. Would you like to train a new model?")
+    st.warning("Pre-trained model not found or invalid. Would you like to train a new model?")
     
     # Only show this if the dataset is available
     if os.path.exists('spam.csv'):
@@ -89,7 +104,7 @@ if not models_loaded:
             with st.spinner("Training model... This may take a minute."):
                 try:
                     # Import here to avoid dependency issues if sklearn isn't available
-                    from sklearn.feature_extraction.text import CountVectorizer
+                    from sklearn.feature_extraction.text import CountVectorizer  # Using CountVectorizer for consistency
                     from sklearn.model_selection import train_test_split
                     from sklearn.naive_bayes import MultinomialNB
                     
@@ -102,6 +117,9 @@ if not models_loaded:
                     # Preprocess text
                     df['processed_text'] = df['text'].apply(simple_preprocess)
                     
+                    # Prepare all texts for fitting the vectorizer
+                    all_texts = df['processed_text'].tolist()
+                    
                     # Split data
                     X_train, X_test, y_train, y_test = train_test_split(
                         df['processed_text'], df['target'], test_size=0.2, random_state=42
@@ -109,15 +127,25 @@ if not models_loaded:
                     
                     # Create and train vectorizer and model
                     vectorizer = CountVectorizer(max_features=3000)
-                    X_train_vect = vectorizer.fit_transform(X_train)
+                    
+                    # First fit on ALL texts to ensure the vectorizer is properly fitted
+                    vectorizer.fit(all_texts)
+                    
+                    # Then transform training data for model fitting
+                    X_train_vect = vectorizer.transform(X_train)
                     model = MultinomialNB()
                     model.fit(X_train_vect, y_train)
                     
                     # Save the trained models
                     with open('vectorizer.pkl', 'wb') as f:
-                        pickle.dump(vectorizer, f)
+                        pickle.dump(vectorizer, f, protocol=4)
                     with open('model.pkl', 'wb') as f:
-                        pickle.dump(model, f)
+                        pickle.dump(model, f, protocol=4)
+                    
+                    # Test the saved models
+                    test_text = "This is a test message"
+                    test_vector = vectorizer.transform([test_text])
+                    model.predict(test_vector)  # Just to verify it works
                     
                     # Update the loaded models
                     models_loaded = True
@@ -127,6 +155,7 @@ if not models_loaded:
                     st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Error training model: {str(e)}")
+                    st.code(str(e))
     else:
         st.error("Dataset not found. Please upload spam.csv file to train a model.")
 
