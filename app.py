@@ -219,4 +219,33 @@ if MODEL_FILES_EXIST and 'models_loaded' in locals() and models_loaded:
     if st.button("Classify Message", type="primary") and message:
         with st.spinner("Analyzing..."):
             # Preprocess text
-            processed_text
+            processed_text = simple_preprocess(message)  # Define processed_text here
+            
+            # Make prediction
+            try:
+                vector = vectorizer.transform([processed_text])
+                prediction = model.predict(vector)[0]
+                
+                # Display result
+                if prediction == 1:
+                    st.markdown("<div class='error-box'><h2>🚨 SPAM DETECTED</h2>This message has been classified as spam.</div>", 
+                                unsafe_allow_html=True)
+                else:
+                    st.markdown("<div class='success-box'><h2>✅ NOT SPAM</h2>This message appears to be legitimate.</div>", 
+                                unsafe_allow_html=True)
+                
+                # Show details in expander
+                with st.expander("See analysis details"):
+                    st.write("**Original message:**")
+                    st.code(message)
+                    st.write("**Processed text:**")
+                    st.code(processed_text)
+            
+            except Exception as e:
+                st.error(f"Classification error: {str(e)}")
+                if "idf" in str(e).lower():
+                    st.warning("There seems to be an issue with the vectorizer. Try retraining the model.")
+                
+                # Show debugging info
+                with st.expander("Debug Information"):
+                    st.code(f"Error type: {type(e).__name__}\nError message: {str(e)}")
