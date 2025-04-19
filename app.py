@@ -67,6 +67,19 @@ if not os.path.exists('spam.csv'):
 else:
     DATASET_EXISTS = True
 
+# Check if running on Streamlit Cloud
+is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
+
+# Special cloud handling - create models on first run if they don't exist
+if is_cloud and (not os.path.exists('vectorizer.pkl') or not os.path.exists('model.pkl')):
+    st.warning("Running on Streamlit Cloud: Attempting to train models on first run...")
+    try:
+        # Redirect to cloud trainer
+        import cloud
+        st.stop()
+    except Exception as e:
+        st.error(f"Error in cloud training: {str(e)}")
+
 # App header
 st.title("📱 SMS Spam Classifier")
 st.markdown("Detect whether a message is spam or not")
@@ -100,6 +113,17 @@ def load_models():
             return vectorizer, model, True
         except Exception as test_err:
             st.sidebar.error(f"Vectorizer test failed: {str(test_err)}")
+            
+            # CLOUD FALLBACK: If on cloud and getting TF-IDF error, try to train a new model
+            if "idf vector is not fitted" in str(test_err):
+                st.warning("Attempting to fix TF-IDF issue by training a new model...")
+                try:
+                    # Redirect to cloud trainer
+                    import cloud
+                    st.stop()
+                except Exception as e:
+                    st.error(f"Error in cloud training: {str(e)}")
+                    
             return None, None, False
             
     except Exception as e:
